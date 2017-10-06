@@ -38,6 +38,7 @@ func main() {
 	do_html := flag.Bool("html", true, "Search HTML files for assets")
 	prefix = flag.String("prefix", "/blog", "site prefix for assets")
 	//do_hugo := flag.Bool("hugo", false, "Search Hugo markdown files for assets")
+	do_unused := flag.Bool("unused", true, "Search for unused assets")
 	flag.Parse()
 	var err error
 	var f *os.File
@@ -56,7 +57,10 @@ func main() {
 	if *do_html {
 		before := time.Now()
 		log.Println("indexing HTML...")
-		index_html(updated)
+		seen := index_html(updated)
+		if *do_unused {
+			find_unused(seen)
+		}
 		log.Println("done in", time.Now().Sub(before))
 	}
 	// if *do_hugo {
@@ -104,7 +108,8 @@ func extract_urls(n *html.Node) []string {
 	return urls
 }
 
-func index_html(updated time.Time) {
+func index_html(updated time.Time) map[string]bool {
+	seen := make(map[string]bool, 100)
 	// walk the current directory looking for HTML files
 	err := filepath.Walk("public", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -155,6 +160,8 @@ func index_html(updated time.Time) {
 					}
 					fmt.Println("\t", u)
 					fmt.Println("\t\t", err)
+				} else {
+					seen[unescaped] = true
 				}
 			}
 		}
@@ -163,6 +170,35 @@ func index_html(updated time.Time) {
 	if err != nil {
 		log.Fatalf("error while walking html", err)
 	}
+	return seen
+}
+
+func find_unused(seen map[string]bool) error {
+	if *verbose {
+		log.Println("looking for unused assets")
+	}
+	// walk the current directory looking for HTML files
+	err := filepath.Walk("static", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if ! info.Mode().IsRegular() {
+			return nil
+		}
+		if *verbose {
+			log.Println("\t", path)
+		}
+		if len(path) < len("static") {
+			return nil
+		}
+		fn := path[len("static"):len(path)]
+		_, ok := seen[fn]
+		if !ok {
+			fmt.Println("unused asset:\t", path)
+		}
+		return nil
+	})
+	return err
 }
 
 // func index_hugo(db *sql.DB, updated time.Time) {
