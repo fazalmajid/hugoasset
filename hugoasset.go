@@ -81,9 +81,9 @@ func extract_urls(n *html.Node) []string {
 				break
 			}
 		}
-		return urls
+		// keep going as the <a> element may have nested <img>s
 	}
-	if n.Type == html.ElementNode && n.DataAtom == atom.Img {
+	if n.Type == html.ElementNode && (n.DataAtom == atom.Img || n.DataAtom == atom.Script) {
 		for _, a := range(n.Attr) {
 			if a.Key == "src" {
 				urls = append(urls, a.Val)
